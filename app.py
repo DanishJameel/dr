@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 # ========== App Title ==========
@@ -43,10 +44,16 @@ else:
         st.warning("⚠️ Not enough previous days for ADR analysis.")
         st.info("Check if the selected date is a weekend, holiday, or too close to the start date.")
     else:
-        # Defensive access for 'High', 'Low', 'ADR'
-        high = recent.loc[0, 'High'] if 'High' in recent.columns else None
-        low = recent.loc[0, 'Low'] if 'Low' in recent.columns else None
-        day1_range = (high - low) if pd.notnull(high) and pd.notnull(low) else None
+        # Defensive access for 'High', 'Low', 'ADR' - use scalars!
+        day1 = recent.iloc[0]  # This is a Series, not a DataFrame
+        high = day1['High']
+        low = day1['Low']
+
+        # Check for NaN or None
+        if pd.isnull(high) or pd.isnull(low):
+            day1_range = None
+        else:
+            day1_range = high - low
 
         adr_3 = recent.loc[1:3, 'ADR'].mean() if 'ADR' in recent.columns else None
 
@@ -59,7 +66,8 @@ else:
         st.markdown(f"- **3-Day ADR (Day 2–4)**: `{adr_3_fmt}`")
 
         # Check for valid values before logic
-        if day1_range is None or adr_3 is None or pd.isnull(day1_range) or pd.isnull(adr_3):
+        if (day1_range is None or adr_3 is None or
+            pd.isnull(day1_range) or pd.isnull(adr_3)):
             st.warning("⚠️ Data for required range or ADR is missing. Please pick another date or check data availability.")
         elif day1_range > adr_3:
             st.error("❌ No Trade Today: Yesterday's range broke the 3-day ADR.")
