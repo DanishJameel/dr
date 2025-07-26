@@ -31,12 +31,21 @@ else:
     data['ADR'] = (data['High'] - data['Low']).rolling(window=14).mean()
 
     # Select 6 most recent days before the input date
-    recent = data[data.index < pd.Timestamp(input_date)].tail(6)
-    recent = recent[::-1].reset_index()  # Day 1 (yesterday) to Day 6
+    # NOTE: data.index is DatetimeIndex
+    mask = data.index < pd.to_datetime(input_date)
+    recent = data[mask].tail(6).copy()
+    recent = recent.iloc[::-1]  # Day 1 (yesterday) to Day 6
 
     if len(recent) < 6:
         st.warning("⚠️ Not enough previous days for ADR analysis.")
+        st.info("Check if the selected date is a weekend or holiday.")
     else:
+        # Reset index so 'Date' is a column
+        recent = recent.reset_index()
+        # Ensure the column is named 'Date'
+        if 'Date' not in recent.columns:
+            recent = recent.rename(columns={'index': 'Date'})
+
         # Day 1: yesterday
         day1_range = recent.loc[0, 'High'] - recent.loc[0, 'Low']
 
@@ -49,7 +58,7 @@ else:
 
         if day1_range > adr_3:
             st.error("❌ No Trade Today: Yesterday's range broke the 3-day ADR.")
-            
+
             # Show detailed 5-day ADR table (Day2 to Day6)
             st.subheader("📊 5-Day ADR Table (Day 2–6)")
             st.dataframe(
