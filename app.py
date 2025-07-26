@@ -44,40 +44,35 @@ else:
         st.warning("⚠️ Not enough previous days for ADR analysis.")
         st.info("Check if the selected date is a weekend, holiday, or too close to the start date.")
     else:
-        # Defensive access for 'High', 'Low', 'ADR' - use scalars!
-        day1 = recent.iloc[0]  # This is a Series, not a DataFrame
-        high = day1['High']
-        low = day1['Low']
+        # Access Day 1 values safely
+        try:
+            high = float(recent.loc[0, 'High'])
+            low = float(recent.loc[0, 'Low'])
+            adr_3 = recent.loc[1:3, 'ADR'].mean()
 
-        # Check for NaN or None
-        if pd.isnull(high) or pd.isnull(low):
-            day1_range = None
-        else:
+            # Compute Range
             day1_range = high - low
 
-        adr_3 = recent.loc[1:3, 'ADR'].mean() if 'ADR' in recent.columns else None
+            # Formatted Display
+            st.subheader("📈 Yesterday’s Range vs 3-Day ADR")
+            st.markdown(f"- **Yesterday’s Range (Day 1)**: `{day1_range:.2f}`")
+            st.markdown(f"- **3-Day ADR (Day 2–4)**: `{adr_3:.2f}`")
 
-        # Prepare formatted strings safely
-        day1_range_fmt = f"{day1_range:.2f}" if day1_range is not None and pd.notnull(day1_range) else "N/A"
-        adr_3_fmt = f"{adr_3:.2f}" if adr_3 is not None and pd.notnull(adr_3) else "N/A"
+            # Logic Decision
+            if day1_range > adr_3:
+                st.error("❌ No Trade Today: Yesterday's range broke the 3-day ADR.")
 
-        st.subheader("📈 Yesterday’s Range vs 3-Day ADR")
-        st.markdown(f"- **Yesterday’s Range (Day 1)**: `{day1_range_fmt}`")
-        st.markdown(f"- **3-Day ADR (Day 2–4)**: `{adr_3_fmt}`")
+                # Detailed ADR table (Day 2–6)
+                st.subheader("📊 5-Day ADR Table (Day 2–6)")
+                table = recent.loc[1:5, ['Date', 'High', 'Low', 'ADR']].copy()
+                table['High'] = table['High'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
+                table['Low'] = table['Low'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
+                table['ADR'] = table['ADR'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
+                st.dataframe(table.rename(columns={"Date": "Day"}))
 
-        # Check for valid values before logic
-        if (day1_range is None or adr_3 is None or
-            pd.isnull(day1_range) or pd.isnull(adr_3)):
-            st.warning("⚠️ Data for required range or ADR is missing. Please pick another date or check data availability.")
-        elif day1_range > adr_3:
-            st.error("❌ No Trade Today: Yesterday's range broke the 3-day ADR.")
+            else:
+                st.success("✅ Trade Allowed Today: Yesterday's range did NOT break the 3-day ADR.")
 
-            # Detailed ADR table (Day 2–6)
-            st.subheader("📊 5-Day ADR Table (Day 2–6)")
-            table = recent.loc[1:5, ['Date', 'High', 'Low', 'ADR']].copy()
-            table['High'] = table['High'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
-            table['Low'] = table['Low'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
-            table['ADR'] = table['ADR'].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
-            st.dataframe(table.rename(columns={"Date": "Day"}))
-        else:
-            st.success("✅ Trade Allowed Today: Yesterday's range did NOT break the 3-day ADR.")
+        except Exception as e:
+            st.warning("⚠️ Data for required range or ADR is missing or invalid.")
+            st.error(f"Details: {e}")
